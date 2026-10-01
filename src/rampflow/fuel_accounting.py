@@ -121,8 +121,10 @@ class FuelLedger:
             raise FuelAccountingError("delivery already reversed")
         if reversal_id in self.deliveries:
             raise FuelAccountingError("duplicate reversal id")
-        observed = quant(original.meter_end_l - original.meter_start_l)
-        observed_mass = quant(observed * original.density_kg_l)
+        # A reversal must cancel exactly the temperature-corrected amounts that
+        # were booked, not the raw metered volume: record() deducted corrected_l
+        # from inventory and flight totals, so restoring the raw meter reading
+        # would leave both ledgers off by the thermal correction.
         reversal = FuelDelivery(
             reversal_id,
             original.flight_id,
@@ -132,16 +134,16 @@ class FuelLedger:
             original.temperature_c,
             original.density_kg_l,
             utc(reversed_at),
-            -observed,
-            -observed_mass,
+            -original.corrected_l,
+            -original.mass_kg,
             original.price_per_l,
-            -quant(observed * original.price_per_l, MONEY),
+            -original.amount,
         )
         self.deliveries[delivery_id] = replace(original, reversed_by=reversal_id)
         self.deliveries[reversal_id] = reversal
-        self.inventory_l[original.tank_id] = quant(self.inventory_l[original.tank_id] + observed)
-        self.flight_totals_l[original.flight_id] = quant(self.flight_totals_l[original.flight_id] - observed)
-        self.flight_totals_kg[original.flight_id] = quant(self.flight_totals_kg[original.flight_id] - observed_mass)
+        self.inventory_l[original.tank_id] = quant(self.inventory_l[original.tank_id] + original.corrected_l)
+        self.flight_totals_l[original.flight_id] = quant(self.flight_totals_l[original.flight_id] - original.corrected_l)
+        self.flight_totals_kg[original.flight_id] = quant(self.flight_totals_kg[original.flight_id] - original.mass_kg)
         return reversal
 
     def replenish(self, tank_id: str, amount_l: Decimal) -> Decimal:

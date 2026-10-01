@@ -117,9 +117,13 @@ class LoadControl:
             total=sum(i.weight_kg for i in items)
             if total>c.capacity()+1e-6:
                 return Decision(False,"compartment-overweight","compartment capacity exceeded",{"compartment":cid})
+            placed:tuple[LoadItem,...]=()
             for i in items:
                 if i.kind not in c.allowed_kinds:
                     return Decision(False,"kind","item in incompatible compartment",{"item":i.item_id})
+                if not self._dangerous_compatible(placed,i):
+                    return Decision(False,"hazmat-separation","incompatible dangerous goods share compartment",{"compartment":cid,"item":i.item_id})
+                placed=placed+(i,)
         for weight,index,label in ((sheet.takeoff_weight_kg,sheet.takeoff_index,"takeoff"),(sheet.landing_weight_kg,sheet.landing_index,"landing")):
             try:lo,hi=self._bounds(weight)
             except ValueError:return Decision(False,"weight-envelope",f"{label} weight outside envelope")

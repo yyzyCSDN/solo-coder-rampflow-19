@@ -79,11 +79,11 @@ class RampWorkflowControl:
         return self._guard(operation_id, "mobile.crew.assignment.committed", subject, at, action, requirements=requirements)
 
     def reconcile_fuel_load(self, operation_id: str, subject: str, at: datetime, action: Callable[[], T], requirements: tuple[Decision, ...] = ()) -> OperationReceipt:
-        event = self.stream.publish(operation_id, utc(at), "fuel.load.reconciliation.committed", subject, {"operation_id": operation_id})
-        result = action()
-        receipt = OperationReceipt(operation_id, event.topic, subject, event, result)
-        self._receipts[operation_id] = receipt
-        return receipt
+        # Fuel reversal and load-sheet replanning are one atomic workflow: the
+        # outward event is published only after the domain change succeeds, and
+        # a rejected requirement (e.g. a rebuilt sheet that fails verification)
+        # leaves the original plan untouched for manual handling.
+        return self._guard(operation_id, "fuel.load.reconciliation.committed", subject, at, action, requirements=requirements)
 
     def commit_turnaround_dispatch(self, operation_id: str, subject: str, at: datetime, action: Callable[[], T], requirements: tuple[Decision, ...] = ()) -> OperationReceipt:
         return self._guard(operation_id, "turnaround.dispatch.committed", subject, at, action, requirements=requirements)

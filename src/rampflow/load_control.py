@@ -120,6 +120,9 @@ class LoadControl:
             for i in items:
                 if i.kind not in c.allowed_kinds:
                     return Decision(False,"kind","item in incompatible compartment",{"item":i.item_id})
+            for pos,item in enumerate(items):
+                if not self._dangerous_compatible(items[:pos],item):
+                    return Decision(False,"hazmat-separation","incompatible dangerous goods share a compartment",{"compartment":cid,"item":item.item_id})
         for weight,index,label in ((sheet.takeoff_weight_kg,sheet.takeoff_index,"takeoff"),(sheet.landing_weight_kg,sheet.landing_index,"landing")):
             try:lo,hi=self._bounds(weight)
             except ValueError:return Decision(False,"weight-envelope",f"{label} weight outside envelope")
